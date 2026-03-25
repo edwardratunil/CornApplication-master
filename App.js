@@ -1,50 +1,56 @@
-import React, { useState } from 'react';
-import { View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import AppNavigator from './navigation/AppNavigator';
 import SplashScreen from './screens/SplashScreen';
-import MainScreen from './screens/MainScreen';
-import { StatusBar } from 'expo-status-bar';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { setGlobalFontSizeMultiplier } from './utils/responsive';
 
-export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false); // FIXED
+function RootApp() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
-  const [showMain, setShowMain] = useState(false);
+  const { theme, fontSizeMultiplier } = useTheme();
+
+  useEffect(() => {
+    setGlobalFontSizeMultiplier(fontSizeMultiplier);
+  }, [fontSizeMultiplier]);
 
   const handleSplashFinish = () => {
     setShowSplash(false);
-    setShowMain(true);
   };
 
-  const handleLoginSuccess = () => {
-    setIsAuthenticated(true);
-    setShowMain(false); // hide MainScreen
-  };
-
-  if (showSplash) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#fff' }}>
-        <SplashScreen onFinish={handleSplashFinish} />
-        <StatusBar style="light" />
-      </View>
-    );
-  }
-
-  if (showMain && !isAuthenticated) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#fff' }}>
-        <MainScreen onLogin={handleLoginSuccess} />
-        <StatusBar style="light" />
-      </View>
-    );
-  }
+  const statusBarStyle = theme.isDark ? 'light' : 'dark';
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <AppNavigator
-        isAuthenticated={isAuthenticated}
-        setIsAuthenticated={setIsAuthenticated}
-      />
-      <StatusBar style="light" />
-    </View>
+    <SafeAreaProvider style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      {showSplash ? (
+        <>
+          <SplashScreen onFinish={handleSplashFinish} />
+          <StatusBar style={statusBarStyle} />
+        </>
+      ) : (
+        <>
+          <AuthProvider
+            isAuthenticated={isAuthenticated}
+            setIsAuthenticated={setIsAuthenticated}
+          >
+            <AppNavigator
+              isAuthenticated={isAuthenticated}
+              setIsAuthenticated={setIsAuthenticated}
+            />
+          </AuthProvider>
+          <StatusBar style={statusBarStyle} />
+        </>
+      )}
+    </SafeAreaProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <RootApp />
+    </ThemeProvider>
   );
 }

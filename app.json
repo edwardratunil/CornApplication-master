@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "CORN MIST",
-    "slug": "corn-mist",
+    "slug": "cornapplication",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
@@ -28,9 +28,12 @@
       "favicon": "./assets/favicon.png"
     },
     "scheme": "cornmist",
+    "plugins": [
+      "expo-web-browser"
+    ],
     "extra": {
       "eas": {
-        "projectId": "your-project-id"
+        "projectId": "7c23a0f6-b988-41f9-b373-8daa83b84ef1"
       }
     }
   }

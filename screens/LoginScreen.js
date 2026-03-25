@@ -1,107 +1,229 @@
-import React, { useState } from 'react';
-import {View, Text,TextInput,StyleSheet,TouchableOpacity,Image,SafeAreaView,KeyboardAvoidingView,Platform,ScrollView,
+import React, { useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { moderateScale, fontScale, SCREEN_WIDTH } from '../utils/responsive';
+import { useTheme } from '../contexts/ThemeContext';
+import { useUser } from '../contexts/UserContext';
 
+const HOSTINGER_AUTH_URL = 'https://cropmist.com/server/auth.php';
 
-
-const logo = require('../assets/logo.png');
-const googleIcon = require('../assets/google.png');
-const xIcon = require('../assets/x.png');
-const facebookIcon = require('../assets/facebook.png');
-const eyeIcon = require('../assets/eye.png');
-const eyeOffIcon = require('../assets/eye-off.png');
-
-export default function LoginScreen({ onLogin, onBack, onForgotPassword }) {
+export default function LoginScreen({ setIsAuthenticated }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigation = useNavigation();
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(theme, insets), [theme, insets]);
+  const { updateUser } = useUser();
+
+  const handleLogin = async () => {
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedEmail || !trimmedPassword) {
+      Alert.alert('Missing Information', 'Please enter both email and password.');
+      return;
+    }
+
+    const emailRegex = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+    if (!emailRegex.test(trimmedEmail)) {
+      Alert.alert('Invalid Email', 'Please provide a valid email address.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch(HOSTINGER_AUTH_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'login',
+          email: trimmedEmail,
+          password: trimmedPassword,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.success) {
+        const message = data?.message || 'Login failed. Please verify your credentials.';
+        
+        // Handle email not verified
+        if (data?.email_not_verified) {
+          Alert.alert(
+            'Email Not Verified',
+            message + '\n\nWould you like to resend the verification email?',
+            [
+              {
+                text: 'Cancel',
+                style: 'cancel',
+              },
+              {
+                text: 'Resend Email',
+                onPress: () => handleResendVerificationEmail(trimmedEmail),
+              },
+            ]
+          );
+          return;
+        }
+        
+        throw new Error(message);
+      }
+
+      const sanitizedData = {
+        id: data.data?.id ?? null,
+        firstName: data.data?.first_name ?? '',
+        lastName: data.data?.last_name ?? '',
+        email: data.data?.email ?? trimmedEmail,
+        role: data.data?.role ?? 'user',
+        avatar: data.data?.avatar ?? 'farmer1',
+      };
+
+      updateUser(sanitizedData);
+      setIsAuthenticated(true);
+    } catch (error) {
+      Alert.alert('Login Error', error.message || 'Unable to log in right now.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = () => {
+    navigation.navigate('ForgotPasswordScreen');
+  };
+
+  const handleResendVerificationEmail = async (email) => {
+    try {
+      const response = await fetch(HOSTINGER_AUTH_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'resend_verification_email',
+          email: email,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.success) {
+        const message = data?.message || 'Failed to resend verification email.';
+        Alert.alert('Error', message);
+        return;
+      }
+
+      Alert.alert('Success', data.message || 'Verification email sent. Please check your inbox.');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to resend verification email. Please try again later.');
+    }
+  };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? moderateScale(60) : insets.bottom}
       >
         <ScrollView
-        
-        contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          {/* Back Button */}
-         
-          {/* Card */}
-          <View style={styles.card}>
-            {/* Logo */}
-            <View style={styles.logoContainer}>
-              <Image source={logo} style={styles.logo} />
-            </View>
-            {/* Title and Subtitle */}
-            <Text style={styles.title}>Log-in</Text>
-            <Text style={styles.subtitle}>please login to continue</Text>
-            {/* Email Input */}
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header with Icon */}
+          <View style={styles.headerContainer}>
+            <Image source={require('../assets/adaptive-icon.png')} style={styles.headerIcon} />
+            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.subtitle}>Monitor Your Farm, Smarter.</Text>
+          </View>
+
+          {/* Email/Username Input */}
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>E Mail</Text>
+            <Text style={styles.inputLabel}>Email or Username</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="person-outline" size={moderateScale(20)} color={theme.colors.icon} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder=""
-                placeholderTextColor="#fff"
+                placeholder="Enter your email or username"
+                placeholderTextColor={theme.colors.mutedText}
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
                 keyboardType="email-address"
               />
             </View>
+          </View>
+
             {/* Password Input */}
             <View style={styles.inputWrapper}>
               <Text style={styles.inputLabel}>Password</Text>
-              <View style={styles.passwordRow}>
+            <View style={styles.inputContainer}>
+              <Ionicons name="lock-closed-outline" size={moderateScale(20)} color={theme.colors.icon} style={styles.inputIcon} />
                 <TextInput
-                  style={[styles.input, { flex: 1 }]}
-                  placeholder=""
-                  placeholderTextColor="#fff"
+                style={styles.input}
+                placeholder="Enter your password"
+                placeholderTextColor={theme.colors.mutedText}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                 />
                <TouchableOpacity
   style={styles.eyeButton}
-  onPress={() => setShowPassword(v => !v)}
+                onPress={() => setShowPassword(!showPassword)}
 >
-  <Image
-    source={showPassword ? eyeIcon : eyeOffIcon}
-    style={{ width: 24, height: 24, tintColor: '#fff' }}
+                <Ionicons
+                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={moderateScale(20)}
+                  color={theme.colors.icon}
   />
 </TouchableOpacity>
               </View>
             </View>
-            {/* Forgot Password */}
-            <TouchableOpacity onPress={onForgotPassword}>
-              <Text style={styles.forgotText}>forgot password??</Text>
+
+          {/* Forgot Password Link */}
+          <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPasswordContainer}>
+            <Text style={styles.forgotText}>Forgot Password?</Text>
             </TouchableOpacity>
-            {/* Log in Button */}
-            <TouchableOpacity style={styles.loginButton} onPress={onLogin}>
-              <Text style={styles.loginButtonText}>Log in</Text>
-              <View style={styles.loginButtonCircle}>
-                <Text style={styles.loginButtonArrow}>{'>'}</Text>
-              </View>
+
+          {/* Login Button */}
+          <TouchableOpacity
+            style={[styles.loginButton, isSubmitting && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color={theme.colors.surface} />
+            ) : (
+              <Text style={styles.loginButtonText}>Login</Text>
+            )}
             </TouchableOpacity>
-            {/* Divider */}
-            <View style={styles.dividerRow}>
-              <View style={styles.divider} />
-              <Text style={styles.orText}>or</Text>
-              <View style={styles.divider} />
-            </View>
-            {/* Social Login */}
-            <Text style={styles.socialText}>Login using{'\n'}social media accounts</Text>
-            <View style={styles.socialRow}>
-              <TouchableOpacity>
-                <Image source={googleIcon} style={styles.socialIcon} />
+
+          {/* Sign Up Link */}
+          <View style={styles.signupRow}>
+            <Text style={styles.signupText}>Don't have an account? </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('RegisterScreen')}>
+              <Text style={styles.signupLink}>Sign Up</Text>
               </TouchableOpacity>
-              <TouchableOpacity>
-                <Image source={xIcon} style={styles.socialIcon} />
-              </TouchableOpacity>
-              <TouchableOpacity>
-                <Image source={facebookIcon} style={styles.socialIcon} />
-              </TouchableOpacity>
-            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -109,184 +231,105 @@ export default function LoginScreen({ onLogin, onBack, onForgotPassword }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme, insets) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
   container: {
-    flex: 1,
-    backgroundColor: '#000',
-    alignItems: 'center',
+      flexGrow: 1,
+      padding: moderateScale(24),
     justifyContent: 'center',
-    padding: 16,   
-  },
-  card: {
-    backgroundColor: '#000',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#fff',
-    width: '100%',
-    maxWidth: 400,
-    paddingTop: 100,
-    paddingBottom: 36,
-    paddingHorizontal: 24,
+      paddingBottom: moderateScale(40) + insets.bottom,
+    },
+    headerContainer: {
     alignItems: 'center',
-    marginTop: 40,
-    marginBottom: 12,
-    shadowColor: '#fff',
-    shadowOpacity: 0.9,
-    shadowRadius: 2,
-    shadowOffset: { width: 1, height: 5 },
-    elevation: 8,
-  },
-  logoContainer: {
-    position: 'absolute',
-    top: -90,
-    alignSelf: 'center',
-    borderRadius: 64,
-    padding: 1, 
-  },
-  logo: {
-    width: 160,
-    height: 160,
+      marginBottom: moderateScale(40),
+    },
+      headerIcon: {
+        width: moderateScale(60),
+        height: moderateScale(60),
+        resizeMode: 'contain',
+        marginBottom: moderateScale(16),
   },
   title: {
-    fontSize: 38,
+      fontSize: fontScale(32),
     fontWeight: 'bold',
-    color: '#fff',
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    marginBottom: 0,
+      color: theme.colors.primaryText,
+      marginBottom: moderateScale(8),
   },
   subtitle: {
-    fontSize: 18,
-    color: '#888',
-    alignSelf: 'flex-start',
-    marginBottom: 18,
-    marginTop: 2,
-    fontWeight: '500',
+      fontSize: fontScale(16),
+      color: theme.colors.mutedText,
   },
   inputWrapper: {
-    width: '100%',
-    marginBottom: 12,
+      marginBottom: moderateScale(20),
   },
   inputLabel: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginBottom: 2,
-    marginLeft: 8,
+      color: theme.colors.primaryText,
+      fontSize: fontScale(14),
+      marginBottom: moderateScale(8),
+      fontWeight: '500',
   },
-  input: {
-    width: '100%',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#FFD600',
-    color: '#fff',
-    fontSize: 17,
-    backgroundColor: '#111',
-    marginTop: 2,
-  },
-  passwordRow: {
+    inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 0,
+      backgroundColor: theme.colors.card,
+      borderRadius: moderateScale(12),
+      paddingHorizontal: moderateScale(16),
+      paddingVertical: moderateScale(12),
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    inputIcon: {
+      marginRight: moderateScale(12),
+    },
+    input: {
+      flex: 1,
+      color: theme.colors.primaryText,
+      fontSize: fontScale(16),
+      padding: 0,
   },
   eyeButton: {
-    padding: 8,
-    marginLeft: -40,
-    zIndex: 1,
+      padding: moderateScale(4),
+    },
+    forgotPasswordContainer: {
+      alignItems: 'flex-end',
+      marginBottom: moderateScale(24),
   },
   forgotText: {
-    color: '#fff',
-    textDecorationLine: 'underline',
-    alignSelf: 'flex-start',
-    marginLeft: 8,
-    marginBottom: 8,
-    marginTop: 2,
+      color: theme.colors.accent,
+      fontSize: fontScale(14),
     fontWeight: '500',
-    fontSize: 14,
   },
   loginButton: {
-    flexDirection: 'row',
+      backgroundColor: theme.colors.accent,
+      borderRadius: moderateScale(12),
+      paddingVertical: moderateScale(16),
     alignItems: 'center',
-    alignSelf: 'flex-end',
-    backgroundColor: '#111',
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: '#fff',
-    paddingVertical: 6,
-    paddingHorizontal: 22,
-    marginTop: 8,
-    marginBottom: 8,
-    shadowColor: '#FFD600',
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
+      marginBottom: moderateScale(24),
+    },
+    buttonDisabled: {
+      opacity: 0.7,
   },
   loginButtonText: {
-    color: '#fff',
+      color: theme.colors.surface,
+      fontSize: fontScale(18),
     fontWeight: 'bold',
-    fontSize: 20,
-    marginRight: 12,
-  },
-  loginButtonCircle: {
-    backgroundColor: '#FFD600',
-    width: 28,
-    height: 28,
-    borderRadius: 19,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loginButtonArrow: {
-    color: '#000',
-    fontWeight: 'bold',
-    fontSize:23,
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    marginVertical: 18,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#fff',
-    opacity: 0.9,
-  },
-  orText: {
-    color: '#fff',
-    fontSize: 16,
-    marginHorizontal: 12,
-    fontWeight: 'bold',
-    opacity: 0.7,
-  },
-  socialText: {
-    color: '#fff',
-    fontSize: 17,
-    textAlign: 'center',
-    marginBottom: 12,
-    fontWeight: '500',
-    opacity: 0.95,
-  },
-  socialRow: {
+    },
+    signupRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 28,
-    width: '100%',
-    marginTop: 0,
+    },
+    signupText: {
+      color: theme.colors.primaryText,
+      fontSize: fontScale(14),
   },
-  socialIcon: {
-    width: 46,
-    height: 46,
-    marginHorizontal: 9,
-    resizeMode: 'contain',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#000', 
-    justifyContent: 'center',
-    alignItems: 'center',
+    signupLink: {
+      color: theme.colors.accent,
+      fontSize: fontScale(14),
+      fontWeight: '600',
   },
 });

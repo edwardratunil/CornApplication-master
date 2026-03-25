@@ -1,321 +1,639 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ImageBackground,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
-} from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+  TextInput,
+  Modal,
+  Alert,
+  Image,
+  ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { moderateScale, fontScale } from '../utils/responsive';
+import { useFarms } from '../contexts/FarmContext';
+import { useTheme } from '../contexts/ThemeContext';
 
-import { LinearGradient } from 'expo-linear-gradient'; 
+export default function DeviceScreen() {
+  const navigation = useNavigation();
+  const {
+    farms,
+    isLoading: farmsLoading,
+    error: farmsError,
+    addFarm,
+    editFarm,
+    removeFarm,
+  } = useFarms();
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(theme, insets), [theme, insets]);
 
-export default function DeviceScreen({ navigation }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [addFarmModalVisible, setAddFarmModalVisible] = useState(false);
+  const [editFarmModalVisible, setEditFarmModalVisible] = useState(false);
+  const [farmName, setFarmName] = useState('');
+  const [farmDescription, setFarmDescription] = useState('');
+  const [editingFarm, setEditingFarm] = useState(null);
+  const [farmSubmitting, setFarmSubmitting] = useState(false);
+  const [sortOrder, setSortOrder] = useState('asc'); // 'asc' for A-Z, 'desc' for Z-A
+
+  useEffect(() => {
+    if (farmsError) {
+      Alert.alert('Farm Service Error', farmsError);
+    }
+  }, [farmsError]);
+
+  const filteredAndSortedFarms = useMemo(() => {
+    // First filter by search query
+    let filtered = farms;
+    if (searchQuery.trim()) {
+      const lowered = searchQuery.trim().toLowerCase();
+      filtered = farms.filter(
+        (farm) =>
+          farm.name.toLowerCase().includes(lowered) ||
+          (farm.address && farm.address.toLowerCase().includes(lowered)) ||
+          (farm.description && farm.description.toLowerCase().includes(lowered))
+      );
+    }
+
+    // Then sort by name
+    const sorted = [...filtered].sort((a, b) => {
+      const nameA = a.name.toLowerCase();
+      const nameB = b.name.toLowerCase();
+      if (sortOrder === 'asc') {
+        return nameA.localeCompare(nameB);
+      } else {
+        return nameB.localeCompare(nameA);
+      }
+    });
+
+    return sorted;
+  }, [farms, searchQuery, sortOrder]);
+
+  const handleAddFarm = async () => {
+    if (!farmName.trim()) {
+      Alert.alert('Validation', 'Please enter a farm name');
+      return;
+    }
+
+    setFarmSubmitting(true);
+    try {
+      await addFarm({
+        name: farmName.trim(),
+        description: farmDescription?.trim() ?? '',
+      });
+      setFarmName('');
+      setFarmDescription('');
+      setAddFarmModalVisible(false);
+      Alert.alert('Success', 'Farm added successfully!');
+    } catch (error) {
+      Alert.alert('Unable to Add Farm', error?.message || 'Please try again.');
+    } finally {
+      setFarmSubmitting(false);
+    }
+  };
+
+  const handleEditFarm = (farm) => {
+    setEditingFarm(farm);
+    setFarmName(farm.name);
+    setFarmDescription(farm.address || farm.description || '');
+    setEditFarmModalVisible(true);
+  };
+
+  const handleUpdateFarm = async () => {
+    if (!farmName.trim()) {
+      Alert.alert('Validation', 'Please enter a farm name');
+      return;
+    }
+
+    setFarmSubmitting(true);
+    try {
+      await editFarm({
+        farmId: editingFarm.id,
+        name: farmName.trim(),
+        description: farmDescription?.trim() ?? '',
+      });
+      setEditFarmModalVisible(false);
+      setEditingFarm(null);
+      setFarmName('');
+      setFarmDescription('');
+      Alert.alert('Success', 'Farm updated successfully!');
+    } catch (error) {
+      Alert.alert('Unable to Update Farm', error?.message || 'Please try again.');
+    } finally {
+      setFarmSubmitting(false);
+    }
+  };
+
+  const handleDeleteFarm = (farm) => {
+    Alert.alert('Delete Farm', `Are you sure you want to delete "${farm.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setFarmSubmitting(true);
+          try {
+            await removeFarm(farm.id);
+            Alert.alert('Success', 'Farm deleted successfully!');
+          } catch (error) {
+            Alert.alert('Unable to Delete Farm', error?.message || 'Please try again later.');
+          } finally {
+            setFarmSubmitting(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleAddModule = (farm) => {
+    navigation.navigate('ModuleScreen', {
+      farmId: farm.id,
+    });
+  };
+
+  const handleCloseModal = () => {
+    setAddFarmModalVisible(false);
+    setFarmName('');
+    setFarmDescription('');
+  };
+
+  const handleCloseEditModal = () => {
+    setEditFarmModalVisible(false);
+    setEditingFarm(null);
+    setFarmName('');
+    setFarmDescription('');
+  };
+
+  const placeholderColor = theme.colors.mutedText;
+
+  const renderFarmCard = (farm) => {
+    const farmAddress = farm.address || farm.description || 'No description provided';
+    return (
+      <View key={farm.id} style={styles.farmCard}>
+        <View style={styles.farmCardContent}>
+          <View style={styles.farmIconContainer}>
+            <Image source={require('../assets/adaptive-icon.png')} style={styles.farmIcon} />
+          </View>
+          <View style={styles.farmInfo}>
+            <Text style={styles.farmName}>{farm.name}</Text>
+            <Text style={styles.farmAddress}>{farmAddress}</Text>
+          </View>
+        </View>
+        <View style={styles.farmActions}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleAddModule(farm)}>
+            <Ionicons name="add-circle" size={moderateScale(20)} color={theme.colors.accent} />
+            <Text style={styles.actionButtonText}>Module</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleEditFarm(farm)}>
+            <Ionicons name="create" size={moderateScale(20)} color={theme.colors.accentSecondary} />
+            <Text style={styles.actionButtonText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleDeleteFarm(farm)}>
+            <Ionicons name="trash" size={moderateScale(20)} color={theme.colors.danger} />
+            <Text style={styles.actionButtonText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
   return (
-    <ImageBackground
-      source={require("../assets/corn_background.jpg")} 
-      style={styles.bg}
-      resizeMode="cover"
-    >
-      <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-          <View style={styles.cardContainer}>
-            {/* Header Section with lighter background */}
-            <View style={styles.headerSection}>
-              {/* Top bar for back button and title */}
-              <View style={styles.topBar}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Farm Locations</Text>
+        </View>
+
+        <View style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Ionicons
+              name="search"
+              size={moderateScale(20)}
+              color={theme.colors.mutedText}
+              style={styles.searchIcon}
+            />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search farm..."
+              placeholderTextColor={placeholderColor}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
                 <TouchableOpacity
-                  onPress={() => {
-                    if (navigation) navigation.goBack();
-                  }}
-                  style={styles.backButton}
+            style={[styles.addFarmButton, farmSubmitting && styles.disabledButton]}
+            onPress={() => setAddFarmModalVisible(true)}
+            disabled={farmSubmitting}
                 >
-                  <Ionicons name="arrow-back" size={28} color="#222" />
+            <Ionicons name="add" size={moderateScale(20)} color={theme.colors.surface} />
+            <Text style={styles.addFarmText}>Add Farm</Text>
                 </TouchableOpacity>
-                <Text style={styles.title}>DEVICES</Text>
+              </View>
+
+        <View style={styles.farmsHeader}>
+          <Text style={styles.farmsTitle}>My Farms</Text>
+          <TouchableOpacity 
+            style={styles.sortButton} 
+            onPress={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+          >
+            <Text style={styles.sortText}>
+              Sort by Name {sortOrder === 'asc' ? '(A-Z)' : '(Z-A)'}
+            </Text>
+            <Ionicons 
+              name={sortOrder === 'asc' ? 'chevron-down' : 'chevron-up'} 
+              size={moderateScale(16)} 
+              color={theme.colors.mutedText} 
+            />
+          </TouchableOpacity>
+            </View>
+
+        {farmsLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.colors.accent} />
+            <Text style={styles.loadingText}>Loading farms...</Text>
+          </View>
+        )}
+
+        {!farmsLoading && filteredAndSortedFarms.length === 0 && (
+          <View style={styles.emptyStateContainer}>
+            <Ionicons name="leaf-outline" size={moderateScale(48)} color={theme.colors.mutedText} />
+            <Text style={styles.emptyStateText}>
+              {searchQuery.trim() ? 'No farms found matching your search.' : 'No farms found. Add a new farm to get started!'}
+            </Text>
+          </View>
+        )}
+
+        {!farmsLoading && filteredAndSortedFarms.map(renderFarmCard)}
+      </ScrollView>
+
+      <Modal
+        visible={addFarmModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add New Farm</Text>
+              <TouchableOpacity onPress={handleCloseModal}>
+                <Ionicons name="close" size={moderateScale(24)} color={theme.colors.icon} />
+              </TouchableOpacity>
+                  </View>
+
+            <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>Farm Name</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter farm name"
+                  placeholderTextColor={placeholderColor}
+                  value={farmName}
+                  onChangeText={setFarmName}
+                />
+                </View>
+              </View>
+
+            <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>Description</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Enter farm description"
+                  placeholderTextColor={placeholderColor}
+                  value={farmDescription}
+                  onChangeText={setFarmDescription}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+                </View>
+              </View>
+
+            <TouchableOpacity
+              style={[
+                styles.modalPrimaryButton,
+                farmSubmitting && styles.disabledButton,
+              ]}
+              onPress={handleAddFarm}
+              disabled={farmSubmitting}
+            >
+              <Text style={styles.modalPrimaryButtonText}>
+                {farmSubmitting ? 'Saving...' : 'Add'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={editFarmModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseEditModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Farm</Text>
+              <TouchableOpacity onPress={handleCloseEditModal}>
+                <Ionicons name="close" size={moderateScale(24)} color={theme.colors.icon} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>Farm Name</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter farm name"
+                  placeholderTextColor={placeholderColor}
+                  value={farmName}
+                  onChangeText={setFarmName}
+                />
               </View>
             </View>
 
-            {/* Blurred Section for Misting and Pesticide Tanks */}
-            <LinearGradient
-              colors={['rgb(178, 178, 116)', 'rgba(147, 147, 89, 0.89)', 'rgba(201, 193, 130, 0.83)']} // White/gray blur gradient
-              style={styles.blurredTankSection}
-              start={{ x: 0, y: 1 }}
-              end={{ x: 0, y: 0 }}
-            >
-              {/* Misting Water Tank */}
-              <View style={styles.deviceSection}>
-                <Text style={styles.deviceNameLight}>Misting Water Tank</Text>
-                {/* Level Row */}
-                <View style={styles.levelRow}>
-                  <Text style={styles.labelLight}>Level:</Text>
-                  <View style={styles.chipGreen}>
-                    <Text style={styles.chipText}>70%</Text>
-                  </View>
-                  <MaterialCommunityIcons
-                    name="check-circle"
-                    size={22}
-                    color="rgb(21, 238, 61)"
-                    style={styles.statusIcon}
-                  />
-                  <Text style={styles.statusGreen}>Ready for misting</Text>
-                </View>
-                {/* Capacity Row */}
-                <View style={styles.capacityRow}>
-                  <Text style={styles.labelLight}>Capacity:</Text>
-                  <Text style={styles.valueBoldLight}>100 L</Text>
-                </View>
+            <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>Description</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Enter farm description"
+                  placeholderTextColor={placeholderColor}
+                  value={farmDescription}
+                  onChangeText={setFarmDescription}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
               </View>
+            </View>
 
-              {/* Pesticide Water Tank */}
-              <View style={styles.deviceSection}>
-                <Text style={styles.deviceNameLight}>Pesticide Water Tank</Text>
-                {/* Level Row */}
-                <View style={styles.levelRow}>
-                  <Text style={styles.labelLight}>Level:</Text>
-                  <View style={styles.chipYellow}>
-                    <Text style={styles.chipText}>50%</Text>
-                  </View>
-                  <MaterialCommunityIcons
-                    name="alert-circle"
-                    size={22}
-                    color="#ff1744"
-                    style={styles.statusIcon}
-                  />
-                  <Text style={styles.statusRed}>Refill Soon</Text>
-                </View>
-                {/* Capacity Row */}
-                <View style={styles.capacityRow}>
-                  <Text style={styles.labelLight}>Capacity:</Text>
-                  <Text style={styles.valueBoldLight}>100 L</Text>
-                </View>
-              </View>
-            </LinearGradient>
-
-            {/* Sensors Section with Black Gradient - Now directly follows */}
-            <LinearGradient
-              colors={['rgba(172, 181, 140, 0.8)', 'rgba(0,0,0,0.95)', 'rgba(0,0,0,0.95)']} // Darker to slightly lighter black
-              style={styles.gradientSensorSection}
-              start={{ x: 0, y: 1 }} // Top-left
-              end={{ x: 1, y: 0 }}   // Bottom-left
+            <TouchableOpacity
+              style={[
+                styles.modalPrimaryButton,
+                farmSubmitting && styles.disabledButton,
+              ]}
+              onPress={handleUpdateFarm}
+              disabled={farmSubmitting}
             >
-              <Text style={styles.sensorTitle}>Ultrasonic Water Level Sensor</Text>
-              <Text style={styles.sensorLabel}>
-                Tank Level: <Text style={styles.sensorHighlight}>85%</Text>
+              <Text style={styles.modalPrimaryButtonText}>
+                {farmSubmitting ? 'Saving...' : 'Update'}
               </Text>
-              <Text style={styles.sensorLabel}>
-                Water Tank: <Text style={styles.sensorHighlight}>400 L</Text>
-              </Text>
-              <Text style={styles.sensorLabel}>
-                Distance: <Text style={styles.sensorHighlightBlue}>20 cm from sensor</Text>
-              </Text>
-
-              <Text style={styles.sensorTitle}>Water Flow Sensor (YF-S201B)</Text>
-              <Text style={styles.sensorLabel}>
-                Flow Rate: <Text style={styles.sensorHighlightBlue}>3.8 L/min</Text>
-              </Text>
-              <Text style={styles.sensorLabel}>
-                Total Water Tank Used Today: <Text style={styles.sensorHighlight}>150 L</Text>
-              </Text>
-
-              <Text style={styles.sensorTitle}>Solenoid Valve</Text>
-              <Text style={styles.sensorLabel}>
-                Valve 1: <Text style={styles.sensorHighlightGreen}>ON  </Text>
-              </Text>
-
-              <Text style={styles.sensorTitle}>GPS Module (Neo 6M)</Text>
-              <Text style={styles.sensorLabel}>
-                Libona, Bukidnon Misamis Oriental
-              </Text>
-              <Text style={styles.sensorHighlightBlue}>
-                8.380680°N, 124.704147°E
-              </Text>
-
-              <Text style={styles.sensorTitle}>
-                DHT22 Temperature & Humidity Sensor
-              </Text>
-              <Text style={styles.sensorLabel}>
-                Temperature: <Text style={styles.sensorHighlight}>24 °C</Text>
-              </Text>
-              <Text style={styles.sensorLabel}>
-                Humidity: <Text style={styles.sensorHighlight}>83%</Text>
-              </Text>
-
-              <Text style={styles.sensorTitle}>Wind Sensor (Anemometer)</Text>
-              <Text style={styles.sensorLabel}>
-                Wind Speed: <Text style={styles.sensorHighlightBlue}>9.7 km/h</Text>
-              </Text>
-            </LinearGradient>
-
-           
-      
-
+            </TouchableOpacity>
           </View>
-        </ScrollView>
+          </View>
+      </Modal>
       </SafeAreaView>
-    </ImageBackground>
   );
 }
 
-const styles = StyleSheet.create({
-  bg: {
-    flex: 1
+const createStyles = (theme, insets) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    scrollView: {
+      flex: 1,
   },
-  cardContainer: {
-    margin: 16,
-    marginBottom: 100,
-    borderRadius: 32,
-    overflow: "hidden",
-    elevation: 5,
+    container: {
+      flexGrow: 1,
+      padding: moderateScale(16),
+      paddingBottom: moderateScale(100) + insets.bottom,
   },
-  headerSection: {
-    backgroundColor: "rgba(254, 249, 249, 0.98)",
-    paddingTop: 24,
-    paddingBottom: 10,
-    paddingHorizontal: 24,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    header: {
+      alignItems: 'center',
+      marginBottom: moderateScale(20),
+    },
+    headerTitle: {
+      fontSize: fontScale(20),
+      fontWeight: 'bold',
+      color: theme.colors.primaryText,
+    },
+    searchContainer: {
+      flexDirection: 'row',
+      marginBottom: moderateScale(20),
+      gap: moderateScale(12),
   },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: 'space-between',
-  },
-  title: {
-    fontSize: 19,
-    fontWeight: "bold",
-    letterSpacing: 1,
-    color: "#222",
+    searchBar: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.card,
+      borderRadius: moderateScale(12),
+      paddingHorizontal: moderateScale(16),
+      paddingVertical: moderateScale(12),
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    searchIcon: {
+      marginRight: moderateScale(8),
+    },
+    searchInput: {
     flex: 1,
-    textAlign: 'center',
-    marginRight: 28,
+      color: theme.colors.primaryText,
+      fontSize: fontScale(14),
+      padding: 0,
   },
-  deviceSection: {
-    marginTop: 10,
-    marginBottom: 15,
-    paddingHorizontal: 24,
-  },
-  deviceNameLight: {
-    color: "#fff", 
-    fontWeight: "bold",
-    fontSize: 17,
-    marginBottom: 5,
-    alignSelf: "center",
-  },
-  labelLight: {
-    color: "#fff",
-    fontSize: 15,
-    marginRight: 10,
-    fontWeight: "bold",
-    
-  },
-  valueBoldLight: {
-    color: "#fff", 
-    fontWeight: "bold",
-    fontSize: 15,
-    marginRight: 9,
-  },
-  
-  levelRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    addFarmButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.accent,
+      borderRadius: moderateScale(12),
+      paddingHorizontal: moderateScale(16),
+      paddingVertical: moderateScale(12),
+      gap: moderateScale(8),
+    },
+    addFarmText: {
+      color: theme.colors.surface,
+      fontSize: fontScale(14),
+      fontWeight: 'bold',
+    },
+    farmsHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: moderateScale(16),
+    },
+    farmsTitle: {
+      fontSize: fontScale(18),
+      fontWeight: 'bold',
+      color: theme.colors.primaryText,
+    },
+    sortButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.card,
+      borderRadius: moderateScale(8),
+      paddingHorizontal: moderateScale(12),
+      paddingVertical: moderateScale(8),
+      gap: moderateScale(6),
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    sortText: {
+      fontSize: fontScale(12),
+      color: theme.colors.mutedText,
+    },
+    loadingContainer: {
+      alignItems: 'center',
     justifyContent: 'center', 
-    marginBottom: 5, 
-    marginLeft: 20,
+      paddingVertical: moderateScale(40),
+      gap: moderateScale(12),
   },
-  capacityRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    loadingText: {
+      fontSize: fontScale(14),
+      color: theme.colors.mutedText,
+    },
+    emptyStateContainer: {
+      alignItems: 'center',
     justifyContent: 'center', 
-    marginRight: 100,
-    
-  },
-  chipGreen: {
-    backgroundColor: "rgb(21, 238, 61)",
-    width: 35, 
-    height: 35,
-    borderRadius: 25, 
+      paddingVertical: moderateScale(40),
+      gap: moderateScale(12),
+    },
+    emptyStateText: {
+      fontSize: fontScale(14),
+      color: theme.colors.mutedText,
+      textAlign: 'center',
+      paddingHorizontal: moderateScale(24),
+    },
+    farmCard: {
+      backgroundColor: theme.colors.card,
+      borderRadius: moderateScale(12),
+      padding: moderateScale(16),
+      marginBottom: moderateScale(12),
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    farmCardContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    farmIconContainer: {
+      width: moderateScale(48),
+      height: moderateScale(48),
+      alignItems: 'center',
     justifyContent: 'center',
+      marginRight: moderateScale(16),
+      borderRadius: moderateScale(12),
+      backgroundColor: theme.colors.subtleCard,
+    },
+    farmIcon: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'contain',
+    },
+    farmInfo: {
+      flex: 1,
+    },
+    farmName: {
+      fontSize: fontScale(16),
+      fontWeight: 'bold',
+      color: theme.colors.primaryText,
+      marginBottom: moderateScale(4),
+    },
+    farmAddress: {
+      fontSize: fontScale(14),
+      color: theme.colors.mutedText,
+    },
+    farmActions: {
+      flexDirection: 'row',
+      marginTop: moderateScale(12),
+      gap: moderateScale(8),
+    },
+    actionButton: {
+      flex: 1,
+      flexDirection: 'row',
     alignItems: 'center', 
-    borderWidth: 1.5,
-    borderColor: "#fff",
-    marginLeft: 10, 
-    marginRight: 10, 
+      justifyContent: 'center',
+      backgroundColor: theme.colors.subtleCard,
+      borderRadius: moderateScale(8),
+      paddingVertical: moderateScale(10),
+      gap: moderateScale(4),
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    actionButtonText: {
+      fontSize: fontScale(12),
+      color: theme.colors.primaryText,
+      fontWeight: '500',
   },
-  chipYellow: {
-    backgroundColor: "rgb(242, 240, 132)",
-    width: 35, 
-    height: 35, 
-    borderRadius: 25, 
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: theme.colors.overlay,
     justifyContent: 'center', 
     alignItems: 'center', 
-    borderWidth: 1.5,
-    borderColor: "#fff",
-    marginLeft: 10, 
-    marginRight: 10,
+      padding: moderateScale(20),
+    },
+    modalCard: {
+      width: '85%',
+      backgroundColor: theme.colors.card,
+      borderRadius: moderateScale(20),
+      padding: moderateScale(24),
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: moderateScale(24),
   },
-  chipText: {
-    color: "#222",
-    fontWeight: "bold",
-    fontSize: 15,
+    modalTitle: {
+      fontSize: fontScale(20),
+      fontWeight: 'bold',
+      color: theme.colors.primaryText,
+    },
+    inputWrapper: {
+      marginBottom: moderateScale(20),
   },
-  statusIcon: {
-    marginLeft: 8,
+    inputLabel: {
+      fontSize: fontScale(14),
+      fontWeight: '500',
+      color: theme.colors.primaryText,
+      marginBottom: moderateScale(8),
   },
-  statusGreen: {
-    color: "rgb(21, 238, 61)",
-    fontWeight: "bold",
-    fontSize: 15,
-    marginLeft: 6,
+    inputContainer: {
+      backgroundColor: theme.colors.subtleCard,
+      borderRadius: moderateScale(12),
+      paddingHorizontal: moderateScale(16),
+      paddingVertical: moderateScale(12),
+      borderWidth: 1,
+      borderColor: theme.colors.border,
   },
-  statusRed: {
-    color: "#ff1744",
-    fontWeight: "bold",
-    fontSize: 15,
-    marginLeft: 6,
+    input: {
+      color: theme.colors.primaryText,
+      fontSize: fontScale(16),
+      padding: 0,
+    },
+    textArea: {
+      minHeight: moderateScale(100),
+      paddingTop: moderateScale(12),
   },
-  gradientSensorSection: {
-    paddingTop: 10,
-    paddingHorizontal: 24,
-    paddingBottom: 20,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+    modalPrimaryButton: {
+      backgroundColor: theme.colors.accent,
+      borderRadius: moderateScale(12),
+      paddingVertical: moderateScale(16),
+      alignItems: 'center',
+      marginTop: moderateScale(8),
   },
-  sensorTitle: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 15,
-    marginTop: 19,
-    alignSelf: "center",
-
-  },
-  sensorLabel: {
-    color: "#fff",
-    fontSize: 14,
-    marginTop: 1,
- 
-    alignSelf: "center",
-  },
-  sensorHighlight: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  sensorHighlightBlue: {
-    color: "#00b2ff",
-    fontWeight: "bold",
-    alignSelf: "center",
-  },
-  sensorHighlightGreen: {
-    color: "rgb(21, 238, 61)",
-    fontWeight: "bold",
+    modalPrimaryButtonText: {
+      color: theme.colors.surface,
+      fontSize: fontScale(18),
+      fontWeight: 'bold',
+    },
+    disabledButton: {
+      opacity: 0.6,
   },
 });

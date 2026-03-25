@@ -1,356 +1,422 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ImageBackground,
-  TouchableOpacity,
-  SafeAreaView,
-  Modal,
-  TextInput,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Image, Modal, Alert, Linking } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { moderateScale, fontScale, setGlobalFontSizeMultiplier } from '../utils/responsive';
+import { useTheme } from '../contexts/ThemeContext';
+import { useUser } from '../contexts/UserContext';
+import { getAvatarSource } from '../utils/avatarAssets';
 
-export default function SettingScreen() {
-  const [systemStatus, setSystemStatus] = useState(true);
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
-  const [securityModalVisible, setSecurityModalVisible] = useState(false);
+const HOSTINGER_AUTH_URL = 'https://cropmist.com/server/auth.php';
+const USER_MANUAL_URL = 'https://www.canva.com/design/DAGeUnDsHYM/z8bJv_2tASZIDfVWXkfP2w/view?utm_content=DAGeUnDsHYM&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h244b831f38';
 
-  // Edit Profile States
-  const [name, setName] = useState('Jam Quijano');
-  const [email, setEmail] = useState('jquijanon@email.com');
-  const [phone, setPhone] = useState('09123456789');
+const FONT_SIZE_OPTIONS = [
+  { label: 'Small', multiplier: 0.85 },
+  { label: 'Medium', multiplier: 1.0 },
+  { label: 'Large', multiplier: 1.15 },
+  { label: 'Extra Large', multiplier: 1.3 },
+];
 
-  // Password Change States
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-
-  // Security & Privacy States
-  const [twoFactor, setTwoFactor] = useState(false);
-
+export default function SettingScreen({ setIsAuthenticated }) {
   const navigation = useNavigation();
+  const { theme, toggleTheme, setFontSize, fontSizeMultiplier } = useTheme();
+  const [pushNotifications, setPushNotifications] = useState(true);
+  const [fontSizeModalVisible, setFontSizeModalVisible] = useState(false);
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const { user } = useUser();
+
+  const isDarkMode = theme.isDark;
+
+  const handleLogout = async () => {
+    if (!user?.id) {
+      // If no user ID, just log out locally
+      if (setIsAuthenticated) {
+        setIsAuthenticated(false);
+      }
+      return;
+    }
+
+    try {
+      // Call logout endpoint to update activity_status
+      await fetch(HOSTINGER_AUTH_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'logout',
+          user_id: user.id,
+        }),
+      });
+    } catch (error) {
+      // Log error but continue with logout
+      console.error('Logout API call failed:', error);
+    } finally {
+      // Always log out locally regardless of API call result
+    if (setIsAuthenticated) {
+      setIsAuthenticated(false);
+      }
+    }
+  };
+
+  const handleOpenUserManual = async () => {
+    try {
+      const supported = await Linking.canOpenURL(USER_MANUAL_URL);
+      if (supported) {
+        await Linking.openURL(USER_MANUAL_URL);
+      } else {
+        Alert.alert('Error', 'Cannot open the user manual URL');
+      }
+    } catch (error) {
+      console.error('Error opening user manual:', error);
+      Alert.alert('Error', 'Failed to open user manual');
+    }
+  };
 
   return (
-    <ImageBackground source={require('../assets/corn_background.jpg')} style={styles.bg}>
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.settingCard}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
           {/* Header */}
-          <View style={styles.headerRow}>
-            <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-              <Ionicons name="arrow-back" size={24} color="#fff" style={styles.backArrowIcon} />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={moderateScale(24)} color={theme.colors.icon} />
             </TouchableOpacity>
-            <Text style={styles.headerText}>Settings</Text>
+          <Text style={styles.headerTitle}>Settings</Text>
+          <View style={styles.headerSpacer} />
           </View>
 
-          {/* System Toggle */}
-          <SettingToggle
-            label="Show System Status"
-            sub="Display current data from sensors"
-            value={systemStatus}
-            onValueChange={setSystemStatus}
+        {/* Account Section */}
+        <Text style={styles.sectionTitle}>Account</Text>
+        <TouchableOpacity style={styles.profileCard} onPress={() => navigation.navigate('AccountDetailsScreen')}>
+          <View style={styles.profileImageContainer}>
+            <Image source={getAvatarSource(user.avatar)} style={styles.profileImage} />
+          </View>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>{`${user.firstName} ${user.lastName}`}</Text>
+            <Text style={styles.profileEmail}>{user.email}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={moderateScale(20)} color={theme.colors.mutedText} />
+            </TouchableOpacity>
+
+        {/* Preferences Section */}
+        <Text style={styles.sectionTitle}>Preferences</Text>
+        
+        {/* Dark Mode Toggle */}
+        <View style={styles.preferenceRow}>
+          <View style={styles.preferenceContent}>
+            <Text style={styles.preferenceLabel}>Dark Mode</Text>
+            <Text style={styles.preferenceSubtext}>Toggle between light and dark theme</Text>
+          </View>
+          <Switch
+            value={isDarkMode}
+            onValueChange={toggleTheme}
+            trackColor={{ false: theme.colors.border, true: theme.colors.accent }}
+            thumbColor={isDarkMode ? theme.colors.surface : '#f4f3f4'}
+            ios_backgroundColor={theme.colors.border}
           />
-
-          {/* Account Settings */}
-          <View style={styles.accountSection}>
-            <Text style={styles.sectionTitle}>Account Settings</Text>
-
-            <TouchableOpacity style={styles.accountItem} onPress={() => setEditModalVisible(true)}>
-              <Text style={styles.accountText}>Edit Profile</Text>
-              <Ionicons name="chevron-forward" size={20} color="#fff" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.accountItem}
-              onPress={() => setPasswordModalVisible(true)}
-            >
-              <Text style={styles.accountText}>Change Password</Text>
-              <Ionicons name="chevron-forward" size={20} color="#fff" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.accountItem}
-              onPress={() => setSecurityModalVisible(true)}
-            >
-              <Text style={styles.accountText}>Security & Privacy</Text>
-              <Ionicons name="chevron-forward" size={20} color="#fff" />
-            </TouchableOpacity>
           </View>
 
-     
-
+        {/* Push Notifications Toggle */}
+        <View style={styles.preferenceRow}>
+          <View style={styles.preferenceContent}>
+            <Text style={styles.preferenceLabel}>Push Notifications</Text>
+            <Text style={styles.preferenceSubtext}>Receive alerts on your device</Text>
         </View>
-      </SafeAreaView>
-
-      {/* Edit Profile Modal */}
-      <Modal visible={editModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Profile</Text>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#fff" />
-              </TouchableOpacity>
+          <Switch
+            value={pushNotifications}
+            onValueChange={setPushNotifications}
+            trackColor={{ false: '#767577', true: '#4CAF50' }}
+            thumbColor={pushNotifications ? '#FFFFFF' : '#f4f3f4'}
+            ios_backgroundColor="#767577"
+          />
             </View>
 
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Full Name"
-              placeholderTextColor="#ccc"
-              value={name}
-              onChangeText={setName}
-            />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Email Address"
-              placeholderTextColor="#ccc"
-              value={email}
-              onChangeText={setEmail}
-            />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Phone Number"
-              placeholderTextColor="#ccc"
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-            />
-
-            <TouchableOpacity style={styles.modalSaveButton} onPress={() => setEditModalVisible(false)}>
-              <Text style={styles.modalSaveText}>Save Changes</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Change Password Modal */}
-      <Modal visible={passwordModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Change Password</Text>
-              <TouchableOpacity onPress={() => setPasswordModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Old Password"
-              placeholderTextColor="#ccc"
-              secureTextEntry
-              value={oldPassword}
-              onChangeText={setOldPassword}
-            />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="New Password"
-              placeholderTextColor="#ccc"
-              secureTextEntry
-              value={newPassword}
-              onChangeText={setNewPassword}
-            />
-
-            <TouchableOpacity style={styles.modalSaveButton} onPress={() => setPasswordModalVisible(false)}>
-              <Text style={styles.modalSaveText}>Update Password</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Security & Privacy Modal */}
-      <Modal visible={securityModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Security & Privacy</Text>
-              <TouchableOpacity onPress={() => setSecurityModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={{ color: '#fff', marginBottom: 10 }}>
-              Enable Two-Factor Authentication
-            </Text>
-            <TouchableOpacity
-              onPress={() => setTwoFactor(!twoFactor)}
-              style={[
-                styles.toggleBtn,
-                { backgroundColor: twoFactor ? '#00ff90' : '#888' },
-              ]}
-            >
-              <Text style={{ color: '#000', fontWeight: 'bold' }}>
-                {twoFactor ? 'Enabled' : 'Disabled'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.modalSaveButton} onPress={() => setSecurityModalVisible(false)}>
-              <Text style={styles.modalSaveText}>Save</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </ImageBackground>
-  );
-}
-
-function SettingToggle({ label, sub, value, onValueChange }) {
-  return (
-    <View style={styles.settingRow}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.label}>{label}</Text>
-        <Text style={styles.sub}>{sub}</Text>
-      </View>
-      <TouchableOpacity onPress={() => onValueChange(!value)}>
-        <View
-          style={{
-            width: 40,
-            height: 24,
-            borderRadius: 12,
-            backgroundColor: value ? '#00ff90' : '#888',
-            justifyContent: 'center',
-            padding: 2,
-          }}
+        {/* Font Size Selection */}
+        <TouchableOpacity 
+          style={styles.preferenceRow}
+          onPress={() => setFontSizeModalVisible(true)}
         >
-          <View
-            style={{
-              width: 20,
-              height: 20,
-              borderRadius: 10,
-              backgroundColor: '#fff',
-              alignSelf: value ? 'flex-end' : 'flex-start',
-            }}
-          />
+          <View style={styles.preferenceContent}>
+            <Text style={styles.preferenceLabel}>Font Size</Text>
+            <Text style={styles.preferenceSubtext}>
+              {FONT_SIZE_OPTIONS.find(opt => opt.multiplier === fontSizeMultiplier)?.label || 'Medium'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={moderateScale(20)} color={theme.colors.mutedText} />
+        </TouchableOpacity>
+
+        {/* Support Section */}
+        <Text style={styles.sectionTitle}>Support</Text>
+        
+        {/* User Manual */}
+        <TouchableOpacity style={styles.supportRow} onPress={handleOpenUserManual}>
+          <Text style={styles.supportLabel}>User Manual</Text>
+          <Ionicons name="chevron-forward" size={moderateScale(20)} color={theme.colors.mutedText} />
+        </TouchableOpacity>
+        
+        {/* Help Center */}
+        <TouchableOpacity style={styles.supportRow} onPress={() => navigation.navigate('HelpCenterScreen')}>
+          <Text style={styles.supportLabel}>Help Center</Text>
+          <Ionicons name="chevron-forward" size={moderateScale(20)} color={theme.colors.mutedText} />
+            </TouchableOpacity>
+
+        {/* Log Out Button */}
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutText}>Log Out</Text>
+            </TouchableOpacity>
+      </ScrollView>
+
+      {/* Font Size Selection Modal */}
+      <Modal
+        visible={fontSizeModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFontSizeModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Font Size</Text>
+              <TouchableOpacity onPress={() => setFontSizeModalVisible(false)}>
+                <Ionicons name="close" size={moderateScale(24)} color={theme.colors.icon} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.modalSubtitle}>Choose your preferred font size</Text>
+            {FONT_SIZE_OPTIONS.map((option) => {
+              const isSelected = option.multiplier === fontSizeMultiplier;
+              return (
+                <TouchableOpacity
+                  key={option.label}
+                  style={[
+                    styles.fontSizeOption,
+                    isSelected && styles.fontSizeOptionSelected,
+                  ]}
+                  onPress={() => {
+                    // Update global font size immediately
+                    setGlobalFontSizeMultiplier(option.multiplier);
+                    // Update theme context (saves to storage)
+                    setFontSize(option.multiplier);
+                    setFontSizeModalVisible(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.fontSizeOptionLabel,
+                      isSelected && styles.fontSizeOptionLabelSelected,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {isSelected && (
+                    <Ionicons
+                      name="checkmark"
+                      size={moderateScale(20)}
+                      color={theme.colors.accent}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
-      </TouchableOpacity>
-    </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  bg: {
+const createStyles = (theme) =>
+  StyleSheet.create({
+    safeArea: {
     flex: 1,
-    resizeMode: 'cover',
+      backgroundColor: theme.colors.background,
   },
-  safe: {
+    scrollView: {
     flex: 1,
-    justifyContent: 'center',
-    padding: 25,
+    },
+    container: {
+      flexGrow: 1,
+      padding: moderateScale(16),
+      paddingBottom: moderateScale(100),
   },
-  settingCard: {
-    backgroundColor: 'rgba(0, 0, 0, 0.79)',
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 80,
-  },
-  headerRow: {
+    header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 30,
+      justifyContent: 'space-between',
+      marginBottom: moderateScale(24),
+      paddingHorizontal: moderateScale(4),
   },
-  backArrowIcon: {
-    marginRight: 10,
-  },
-  headerText: {
-    fontSize: 22,
-    color: '#fff',
+    headerTitle: {
+      fontSize: fontScale(20),
+      fontWeight: 'bold',
+      color: theme.colors.primaryText,
+      flex: 1,
+      textAlign: 'center',
+    },
+    headerSpacer: {
+      width: moderateScale(24),
+    },
+    sectionTitle: {
+      fontSize: fontScale(18),
     fontWeight: 'bold',
-    marginLeft: 101,
+      color: theme.colors.primaryText,
+      marginTop: moderateScale(24),
+      marginBottom: moderateScale(12),
   },
-  settingRow: {
+    profileCard: {
+      backgroundColor: theme.colors.card,
+      borderRadius: moderateScale(12),
+      padding: moderateScale(16),
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-
+      marginBottom: moderateScale(8),
+    },
+    profileImageContainer: {
+      width: moderateScale(56),
+      height: moderateScale(56),
+      borderRadius: moderateScale(28),
+      backgroundColor: theme.colors.subtleCard,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: moderateScale(16),
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    profileImage: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
+    profileInfo: {
+      flex: 1,
   },
-  label: {
-    color: '#fff',
+    profileName: {
+      fontSize: fontScale(16),
     fontWeight: 'bold',
-    fontSize: 16,
-    marginBottom: 2,
+      color: theme.colors.primaryText,
+      marginBottom: moderateScale(4),
   },
-  sub: {
-    color: '#ccc',
-    fontSize: 13,
-    marginBottom: 8,
+    profileEmail: {
+      fontSize: fontScale(14),
+      color: theme.colors.mutedText,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 12,
-  },
-  accountSection: {
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  accountItem: {
+    preferenceRow: {
+      backgroundColor: theme.colors.card,
+      borderRadius: moderateScale(12),
+      padding: moderateScale(16),
     flexDirection: 'row',
+      alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#fff',
+      marginBottom: moderateScale(8),
+      borderWidth: 1,
+      borderColor: theme.colors.border,
   },
-  accountText: {
-    fontSize: 15,
-    color: '#fff',
-  },
-  saveButtonText: {
+    preferenceContent: {
+      flex: 1,
+      marginRight: moderateScale(16),
+    },
+    preferenceLabel: {
+      fontSize: fontScale(16),
     fontWeight: 'bold',
-    color: '#000',
-    fontSize: 16,
+      color: theme.colors.primaryText,
+      marginBottom: moderateScale(4),
+    },
+    preferenceSubtext: {
+      fontSize: fontScale(14),
+      color: theme.colors.mutedText,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalCard: {
-    width: '85%',
-    backgroundColor: '#111',
-    borderRadius: 20,
-    padding: 20,
-  },
-  modalHeader: {
+    supportRow: {
+      backgroundColor: theme.colors.card,
+      borderRadius: moderateScale(12),
+      padding: moderateScale(16),
     flexDirection: 'row',
+      alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+      marginBottom: moderateScale(8),
+      borderWidth: 1,
+      borderColor: theme.colors.border,
   },
-  modalTitle: {
-    color: '#fff',
-    fontSize: 18,
+    supportLabel: {
+      fontSize: fontScale(16),
     fontWeight: 'bold',
+      color: theme.colors.primaryText,
   },
-  modalInput: {
-    backgroundColor: '#222',
-    color: '#fff',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 10,
-    fontSize: 14,
-  },
-  modalSaveButton: {
-    backgroundColor: '#FFD700',
-    paddingVertical: 10,
-    borderRadius: 12,
+    logoutButton: {
+      backgroundColor: theme.colors.card,
+      borderRadius: moderateScale(12),
+      padding: moderateScale(16),
     alignItems: 'center',
-    marginTop: 8,
+      marginTop: moderateScale(24),
+      borderWidth: 1,
+      borderColor: theme.colors.border,
   },
-  modalSaveText: {
+    logoutText: {
+      fontSize: fontScale(16),
     fontWeight: 'bold',
-    color: '#000',
-    fontSize: 16,
+      color: theme.colors.danger,
   },
-  toggleBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 12,
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: theme.colors.overlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: moderateScale(20),
+    },
+    modalCard: {
+      width: '85%',
+      maxWidth: moderateScale(400),
+      backgroundColor: theme.colors.card,
+      borderRadius: moderateScale(20),
+      padding: moderateScale(24),
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: moderateScale(8),
+    },
+    modalTitle: {
+      fontSize: fontScale(20),
+      fontWeight: 'bold',
+      color: theme.colors.primaryText,
+    },
+    modalSubtitle: {
+      fontSize: fontScale(14),
+      color: theme.colors.mutedText,
+      marginBottom: moderateScale(20),
+    },
+    fontSizeOption: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: moderateScale(16),
+      paddingHorizontal: moderateScale(16),
+      borderRadius: moderateScale(12),
+      marginBottom: moderateScale(8),
+      backgroundColor: theme.colors.subtleCard,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    fontSizeOptionSelected: {
+      backgroundColor: theme.colors.accent + '20',
+      borderColor: theme.colors.accent,
+      borderWidth: 2,
+    },
+    fontSizeOptionLabel: {
+      fontSize: fontScale(16),
+      color: theme.colors.primaryText,
+      fontWeight: '500',
+    },
+    fontSizeOptionLabelSelected: {
+      color: theme.colors.accent,
+      fontWeight: 'bold',
   },
 });

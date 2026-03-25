@@ -1,5 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { moderateScale, fontScale } from '../utils/responsive';
 
 export default function ModernButton({ title, onPress, style, textStyle, variant = 'primary' }) {
   return (
@@ -8,17 +9,15 @@ export default function ModernButton({ title, onPress, style, textStyle, variant
       style={[styles.buttonBase, variant === 'primary' ? styles.primary : styles.secondary, style]}
     >
       <Text style={[styles.buttonText, textStyle]}>{title}</Text>
-      
     </TouchableOpacity>
-    
   );
 }
 
 const styles = StyleSheet.create({
   buttonBase: {
-    borderRadius: 30,
-    paddingVertical: 7,
-    paddingHorizontal: 2,
+    borderRadius: moderateScale(30),
+    paddingVertical: moderateScale(7),
+    paddingHorizontal: moderateScale(2),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -35,6 +34,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 12,
+    fontSize: fontScale(12),
   },
 });
