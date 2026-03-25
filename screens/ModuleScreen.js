@@ -86,7 +86,7 @@ export default function ModuleScreen() {
     const url = Platform.select({
       ios: `maps://app?daddr=${lat},${lon}&directionsmode=driving`,
       android: `google.navigation:q=${lat},${lon}`,
-      default: `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`,
+      default: ``,
     });
 
     Linking.canOpenURL(url)
@@ -95,7 +95,7 @@ export default function ModuleScreen() {
           return Linking.openURL(url);
         } else {
           // Fallback to web version
-          const webUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+          const webUrl = ``;
           return Linking.openURL(webUrl);
         }
       })

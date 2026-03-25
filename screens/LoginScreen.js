@@ -19,7 +19,7 @@ import { moderateScale, fontScale, SCREEN_WIDTH } from '../utils/responsive';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 
-const HOSTINGER_AUTH_URL = 'https://cropmist.com/server/auth.php';
+const HOSTINGER_AUTH_URL = '';
 
 export default function LoginScreen({ setIsAuthenticated }) {
   const [email, setEmail] = useState('');

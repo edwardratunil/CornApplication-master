@@ -14,7 +14,7 @@ import {
   getAvatarSource,
 } from '../utils/avatarAssets';
 
-const HOSTINGER_AUTH_URL = 'https://cropmist.com/server/auth.php';
+const HOSTINGER_AUTH_URL = '';
 
 export default function AccountDetailsScreen() {
   const navigation = useNavigation();

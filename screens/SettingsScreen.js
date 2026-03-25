@@ -8,8 +8,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import { getAvatarSource } from '../utils/avatarAssets';
 
-const HOSTINGER_AUTH_URL = 'https://cropmist.com/server/auth.php';
-const USER_MANUAL_URL = 'https://www.canva.com/design/DAGeUnDsHYM/z8bJv_2tASZIDfVWXkfP2w/view?utm_content=DAGeUnDsHYM&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h244b831f38';
+const HOSTINGER_AUTH_URL = '';
+const USER_MANUAL_URL = '';
 
 const FONT_SIZE_OPTIONS = [
   { label: 'Small', multiplier: 0.85 },

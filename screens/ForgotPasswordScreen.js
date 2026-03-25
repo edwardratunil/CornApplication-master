@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { moderateScale, fontScale } from '../utils/responsive';
 import { useTheme } from '../contexts/ThemeContext';
 
-const HOSTINGER_AUTH_URL = 'https://cropmist.com/server/auth.php';
+const HOSTINGER_AUTH_URL = '';
 
 const STEP = {
   EMAIL: 1,

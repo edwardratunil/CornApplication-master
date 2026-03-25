@@ -28,14 +28,14 @@ AP_PASSWORD = '12345678'
 AP_IP = '192.168.4.1'
 PORT = 80
 
-SERVER_SYNC_URL = 'https://cropmist.com/server/device_gateway.php'
+SERVER_SYNC_URL = ''
 DEFAULT_SYNC_INTERVAL = 2  # seconds
 DEFAULT_RELAY_FETCH_INTERVAL = 1  # seconds
 DEFAULT_SENSOR_SAMPLE_INTERVAL = 6  # seconds
 SENSOR_SAMPLE_DURATION = 1  # seconds spent measuring wind/flow
 HANDSHAKE_RETRY = 60  # seconds
-WEBSOCKET_URL = 'wss://function-bun-production-0abb.up.railway.app/ws'
-WEBSOCKET_TOKEN = 'cropmist-relay-secret-2025'
+WEBSOCKET_URL = ''
+WEBSOCKET_TOKEN = ''
 WEBSOCKET_RETRY = 5  # seconds between reconnect attempts
 
 ws_client = None

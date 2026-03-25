@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { moderateScale, fontScale, SCREEN_WIDTH } from '../utils/responsive';
 import { useTheme } from '../contexts/ThemeContext';
 
-const HOSTINGER_AUTH_URL = 'https://cropmist.com/server/auth.php';
+const HOSTINGER_AUTH_URL = '';
 
 export default function RegisterScreen() {
   const navigation = useNavigation();

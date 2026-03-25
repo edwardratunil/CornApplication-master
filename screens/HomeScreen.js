@@ -436,7 +436,7 @@ export default function HomeScreen() {
 
       const lat = location.coords.latitude;
       const lon = location.coords.longitude;
-      const url = `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${lat},${lon}&days=5`;
+      const url = ``;
 
       const res = await fetch(url);
       const text = await res.text();

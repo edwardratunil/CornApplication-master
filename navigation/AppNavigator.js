@@ -11,7 +11,7 @@ import { UserProvider, useUser } from '../contexts/UserContext';
 import { AlertProvider } from '../contexts/AlertContext';
 import HeartbeatManager from '../components/HeartbeatManager';
 
-const HOSTINGER_AUTH_URL = 'https://cropmist.com/server/auth.php';
+const HOSTINGER_AUTH_URL = '';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';

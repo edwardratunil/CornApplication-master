@@ -387,7 +387,7 @@ function generateVerificationToken(): string
 
 function sendVerificationEmail(string $email, string $firstName, string $token): bool
 {
-    $verificationUrl = 'https://cropmist.com/server/auth.php?action=verify_email&token=' . urlencode($token);
+    $verificationUrl = '' . urlencode($token);
     
     $subject = 'Verify Your Corn Mist Account Email';
     

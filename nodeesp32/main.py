@@ -20,7 +20,7 @@ AP_PASSWORD = '12345678'
 AP_IP = '192.168.4.1'
 PORT = 80
 
-SERVER_SYNC_URL = 'https://cropmist.com/server/device_gateway.php'
+SERVER_SYNC_URL = ''
 DEFAULT_SYNC_INTERVAL = 4  # seconds
 DEFAULT_SENSOR_SAMPLE_INTERVAL = 6  # seconds
 GPS_READ_INTERVAL = 2  # Read GPS every 2 seconds (GPS sends at 1Hz, so this gives time to accumulate)

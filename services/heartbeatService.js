@@ -3,7 +3,7 @@
  * Sends periodic pings to the server while the app is active
  */
 
-const HOSTINGER_AUTH_URL = 'https://cropmist.com/server/auth.php';
+const HOSTINGER_AUTH_URL = '';
 
 // Send heartbeat every 30 seconds while app is active
 // More frequent heartbeat = faster detection of disconnection

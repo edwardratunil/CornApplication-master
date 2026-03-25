@@ -1,4 +1,4 @@
-const HOSTINGER_FARM_URL = 'https://cropmist.com/server/farm.php';
+const HOSTINGER_FARM_URL = '';
 
 async function postToFarmEndpoint(action, payload) {
   const body = JSON.stringify({
